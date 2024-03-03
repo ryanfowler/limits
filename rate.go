@@ -71,8 +71,8 @@ func (r *Rate[K]) maybeReset() int64 {
 		return pastMs
 	}
 
-	isRed := r.isRed.Load()
 	if r.lastResetTime.CompareAndSwap(lastReset, now) {
+		isRed := r.isRed.Load()
 		r.getEstimator(!isRed).Reset()
 		r.isRed.Store(!isRed)
 
