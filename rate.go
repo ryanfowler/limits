@@ -41,37 +41,29 @@ func NewRateWithSize[K Key](interval time.Duration, hashes, slots int) *Rate[K] 
 	}
 }
 
-// Get returns the total estimated number of events per interval. It will
-// consider data from between 1 to 2 intervals in the past.
-func (r *Rate[K]) Get(key K) float64 {
-	return r.rate(key, func(e Estimator[K]) int64 { return e.Get(key) })
+// Get returns the total estimated number of events in the previous interval.
+func (r *Rate[K]) Get(key K) int64 {
+	pastMs := r.maybeReset()
+	if pastMs >= 2*r.resetIntervalMs {
+		return 0
+	}
+	return r.getEstimator(!r.isRed.Load()).Get(key)
 }
 
 // Observe is the equivalent of calling `ObserveN(key, 1)`.
-func (r *Rate[K]) Observe(key K) float64 {
+func (r *Rate[K]) Observe(key K) int64 {
 	return r.ObserveN(key, 1)
 }
 
-// ObserveNS records 'n' events for the provided key, returning the total
-// estimated number of events per interval.
-func (r *Rate[K]) ObserveN(key K, n int64) float64 {
-	return r.rate(key, func(e Estimator[K]) int64 { return e.IncrN(key, n) })
+// ObserveN records 'n' events for the provided key, returning the total
+// estimated number of events in the current interval.
+func (r *Rate[K]) ObserveN(key K, n int64) int64 {
+	r.maybeReset()
+	return r.getEstimator(r.isRed.Load()).IncrN(key, n)
 }
 
-func (r *Rate[K]) rate(key K, fn func(Estimator[K]) int64) float64 {
+func (r *Rate[K]) maybeReset() int64 {
 	now := time.Since(r.start).Milliseconds()
-	r.maybeReset(now)
-
-	isRed := r.isRed.Load()
-	lastReset := r.lastResetTime.Load()
-	curr := fn(r.getEstimator(isRed))
-	past := r.getEstimator(!isRed).Get(key)
-
-	interval := float64(abs(r.resetIntervalMs + now - lastReset))
-	return float64(curr+past) * float64(r.resetIntervalMs) / interval
-}
-
-func (r *Rate[K]) maybeReset(now int64) int64 {
 	lastReset := r.lastResetTime.Load()
 	pastMs := now - lastReset
 
