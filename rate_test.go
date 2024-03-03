@@ -1,7 +1,6 @@
 package limits
 
 import (
-	"math"
 	"strconv"
 	"sync"
 	"testing"
@@ -10,32 +9,32 @@ import (
 
 func TestRateBasic(t *testing.T) {
 	key := "1"
-	r := NewRate(10 * time.Millisecond)
+	r := NewRate[string](10 * time.Millisecond)
 
-	v := r.ObserveString(key)
-	assertIntsEqual(t, 1, v)
-	v = r.ObserveNString(key, 2)
-	assertIntsEqual(t, 3, v)
-	f := r.PerSecondString(key)
-	assertFloatsEqual(t, 0.0, f)
-
-	time.Sleep(11 * time.Millisecond)
-	v = r.ObserveString(key)
-	assertIntsEqual(t, 1, v)
-	f = r.PerSecondString(key)
-	assertFloatsEqual(t, 300.0, f)
+	v := r.Observe(key)
+	assertFloatBetween(t, v, 0.000001, 1.0)
+	v = r.ObserveN(key, 2)
+	assertFloatBetween(t, v, 0.000001, 3.0)
+	v = r.Get(key)
+	assertFloatBetween(t, v, 0.000001, 3.0)
 
 	time.Sleep(11 * time.Millisecond)
-	f = r.PerSecondString(key)
-	assertFloatsEqual(t, 100.0, f)
+	v = r.Observe(key)
+	assertFloatBetween(t, v, 1.0, 4.0)
+	v = r.Get(key)
+	assertFloatBetween(t, v, 1.0, 4.0)
 
 	time.Sleep(11 * time.Millisecond)
-	f = r.PerSecondString(key)
-	assertFloatsEqual(t, 0.0, f)
+	v = r.Get(key)
+	assertFloatBetween(t, v, 0.000001, 1.0)
+
+	time.Sleep(11 * time.Millisecond)
+	v = r.Get(key)
+	assertFloatBetween(t, v, -0.01, 0.01)
 }
 
 func TestRateConcurrency(t *testing.T) {
-	r := NewRate(time.Second)
+	r := NewRate[string](time.Second)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -44,7 +43,7 @@ func TestRateConcurrency(t *testing.T) {
 			defer wg.Done()
 			key := strconv.Itoa(i + 1)
 			for j := 0; j < 1000; j++ {
-				r.ObserveString(key)
+				r.Observe(key)
 			}
 		}()
 	}
@@ -52,59 +51,50 @@ func TestRateConcurrency(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		key := strconv.Itoa(i + 1)
-		if v := r.ObserveString(key); v != 1001 {
-			t.Fatalf("unexpected value: %d", v)
+		if v := r.Get(key); v < 100.0 || v > 1000.0 {
+			t.Fatalf("unexpected value: %v", v)
 		}
 	}
 }
 
-func assertIntsEqual(t *testing.T, exp, got int64) {
+func assertFloatBetween(t *testing.T, got, min, max float64) {
 	t.Helper()
 
-	if exp != got {
-		t.Fatalf("expected '%d', got '%d'", exp, got)
+	if got > max || got < min {
+		t.Fatalf("expected between'%f' and '%f', got '%f'", min, max, got)
 	}
 }
 
-func assertFloatsEqual(t *testing.T, exp, got float64) {
-	t.Helper()
-
-	const threshold = 1e-9
-	if math.Abs(exp-got) > threshold {
-		t.Fatalf("expected '%f', got '%f'", exp, got)
-	}
-}
-
-func BenchmarkRatePerSecondString(b *testing.B) {
-	r := NewRate(time.Second)
+func BenchmarkGetString(b *testing.B) {
+	r := NewRate[string](time.Second)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r.PerSecondString("a")
+		r.Get("a")
 	}
 }
 
-func BenchmarkRatePerSecondBytes(b *testing.B) {
-	r := NewRate(time.Second)
+func BenchmarkGetBytes(b *testing.B) {
+	r := NewRate[[]byte](time.Second)
 	key := []byte("a")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r.PerSecondBytes(key)
+		r.Get(key)
 	}
 }
 
 func BenchmarkRateObserveString(b *testing.B) {
-	r := NewRate(time.Second)
+	r := NewRate[string](time.Second)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r.ObserveString("a")
+		r.Observe("a")
 	}
 }
 
 func BenchmarkRateObserveBytes(b *testing.B) {
-	r := NewRate(time.Second)
+	r := NewRate[[]byte](time.Second)
 	key := []byte("a")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r.ObserveBytes(key)
+		r.Observe(key)
 	}
 }

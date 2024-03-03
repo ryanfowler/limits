@@ -5,20 +5,13 @@ import (
 	"time"
 )
 
-const (
-	// DefaultHashes represents the default value for the number of hashes.
-	DefaultHashes = 4
-	// DefaultSlots represents the default value for the number of slots.
-	DefaultSlots = 1024
-)
-
 // Rate is a probabilistic rate estimator over a given interval. Internally, it
 // uses multiple `Estimator`s to track the number of events per key.
 //
 // A Rate instance is lock-free, but is safe to use concurrency from multiple
 // goroutines.
-type Rate struct {
-	red, blue       Estimator
+type Rate[K Key] struct {
+	red, blue       Estimator[K]
 	isRed           atomic.Bool
 	start           time.Time
 	resetIntervalMs int64
@@ -27,20 +20,20 @@ type Rate struct {
 
 // NewRate returns a new Rate instance using the provided interval and default
 // sizes. NewRate panics if interval is smaller than 1 millisecond.
-func NewRate(interval time.Duration) *Rate {
-	return NewRateWithSize(interval, DefaultHashes, DefaultSlots)
+func NewRate[K Key](interval time.Duration) *Rate[K] {
+	return NewRateWithSize[K](interval, DefaultHashes, DefaultSlots)
 }
 
 // NewRateWithSize returns a new Rate instance using the provided interval and
 // hash/slot sizes. NewRateWithSize panics if interval is smaller than 1
 // millisecond.
-func NewRateWithSize(interval time.Duration, hashes, slots int) *Rate {
+func NewRateWithSize[K Key](interval time.Duration, hashes, slots int) *Rate[K] {
 	if interval < time.Millisecond {
 		panic("limits: interval must be 1 millisecond or greater")
 	}
-	return &Rate{
-		red:             NewEstimator(hashes, slots),
-		blue:            NewEstimator(hashes, slots),
+	return &Rate[K]{
+		red:             NewEstimatorWithSize[K](hashes, slots),
+		blue:            NewEstimatorWithSize[K](hashes, slots),
 		isRed:           atomic.Bool{},
 		start:           time.Now().UTC(),
 		resetIntervalMs: interval.Milliseconds(),
@@ -48,44 +41,37 @@ func NewRateWithSize(interval time.Duration, hashes, slots int) *Rate {
 	}
 }
 
-// PerSecondString returns the estimated rate per second for the provided key
-// based on the previous interval.
-func (r *Rate) PerSecondString(key string) float64 {
-	return r.perSecond(func(e Estimator) int64 { return e.GetString(key) })
+// Get returns the total estimated number of events per interval. It will
+// consider data from between 1 to 2 intervals in the past.
+func (r *Rate[K]) Get(key K) float64 {
+	return r.rate(key, func(e Estimator[K]) int64 { return e.Get(key) })
 }
 
-// PerSecondBytes returns the estimated rate per second for the provided key
-// based on the previous interval.
-func (r *Rate) PerSecondBytes(key []byte) float64 {
-	return r.perSecond(func(e Estimator) int64 { return e.GetBytes(key) })
+// Observe is the equivalent of calling `ObserveN(key, 1)`.
+func (r *Rate[K]) Observe(key K) float64 {
+	return r.ObserveN(key, 1)
 }
 
-// ObserveString is the equivalent of calling `ObserveNString(key, 1)`.
-func (r *Rate) ObserveString(key string) int64 {
-	return r.ObserveNString(key, 1)
+// ObserveNS records 'n' events for the provided key, returning the total
+// estimated number of events per interval.
+func (r *Rate[K]) ObserveN(key K, n int64) float64 {
+	return r.rate(key, func(e Estimator[K]) int64 { return e.IncrN(key, n) })
 }
 
-// ObserveNString records 'n' events for the provided key, returning the total
-// estimated number of events for the current interval.
-func (r *Rate) ObserveNString(key string, n int64) int64 {
-	r.maybeReset()
-	return r.getEstimator(r.isRed.Load()).IncrNString(key, n)
-}
-
-// ObserveBytes is the equivalent of calling `ObserveNBytes(key, 1)`.
-func (r *Rate) ObserveBytes(key []byte) int64 {
-	return r.ObserveNBytes(key, 1)
-}
-
-// ObserveNBytes records 'n' events for the provided key, returning the total
-// estimated number of events for the current interval.
-func (r *Rate) ObserveNBytes(key []byte, n int64) int64 {
-	r.maybeReset()
-	return r.getEstimator(r.isRed.Load()).IncrNBytes(key, n)
-}
-
-func (r *Rate) maybeReset() int64 {
+func (r *Rate[K]) rate(key K, fn func(Estimator[K]) int64) float64 {
 	now := time.Since(r.start).Milliseconds()
+	r.maybeReset(now)
+
+	isRed := r.isRed.Load()
+	lastReset := r.lastResetTime.Load()
+	curr := fn(r.getEstimator(isRed))
+	past := r.getEstimator(!isRed).Get(key)
+
+	interval := float64(abs(r.resetIntervalMs + now - lastReset))
+	return float64(curr+past) * float64(r.resetIntervalMs) / interval
+}
+
+func (r *Rate[K]) maybeReset(now int64) int64 {
 	lastReset := r.lastResetTime.Load()
 	pastMs := now - lastReset
 
@@ -108,18 +94,14 @@ func (r *Rate) maybeReset() int64 {
 	return pastMs
 }
 
-func (r *Rate) getEstimator(isRed bool) Estimator {
+func (r *Rate[K]) getEstimator(isRed bool) Estimator[K] {
 	if isRed {
 		return r.red
 	}
 	return r.blue
 }
 
-func (r *Rate) perSecond(fn func(Estimator) int64) float64 {
-	pastMs := r.maybeReset()
-	if pastMs >= 2*r.resetIntervalMs {
-		return 0.0
-	}
-
-	return 1000.0 * float64(fn(r.getEstimator(!r.isRed.Load()))) / float64(r.resetIntervalMs)
+func abs(n int64) int64 {
+	mask := n >> 63
+	return (mask + n) ^ mask
 }

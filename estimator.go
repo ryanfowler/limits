@@ -1,14 +1,22 @@
 package limits
 
 import (
+	"fmt"
 	"hash/maphash"
 	"math"
 	"sync/atomic"
 )
 
-type hashSlots struct {
-	seed  maphash.Seed
-	slots []atomic.Int64
+const (
+	// DefaultHashes represents the default value for the number of hashes.
+	DefaultHashes = 4
+	// DefaultSlots represents the default value for the number of slots.
+	DefaultSlots = 1024
+)
+
+// Key represents the type constraint for keys.
+type Key interface {
+	~string | ~[]byte
 }
 
 // Estimator is an implementation of the count-min sketch data structure.
@@ -17,13 +25,25 @@ type hashSlots struct {
 // multiple goroutines.
 //
 // For more info: https://en.wikipedia.org/wiki/Count%E2%80%93min_sketch
-type Estimator struct {
+type Estimator[K Key] struct {
 	data []hashSlots
 }
 
-// NewEstimator returns a new Estimator instance using the provided number of
-// hashes and slots.
-func NewEstimator(hashes, slots int) Estimator {
+type hashSlots struct {
+	seed  maphash.Seed
+	slots []atomic.Int64
+}
+
+// NewEstimator returns a new Estimator instance using the default hash and slot
+// sizes.
+func NewEstimator[K Key]() Estimator[K] {
+	return NewEstimatorWithSize[K](DefaultHashes, DefaultSlots)
+}
+
+// NewEstimatorWithSize returns a new Estimator instance using the provided
+// number of hashes and slots. This function panics if hashes or slots are less
+// than or equal to zero.
+func NewEstimatorWithSize[K Key](hashes, slots int) Estimator[K] {
 	if hashes <= 0 {
 		panic("limits: hashes must be greater than 0")
 	}
@@ -39,43 +59,43 @@ func NewEstimator(hashes, slots int) Estimator {
 		}
 	}
 
-	return Estimator{data}
+	return Estimator[K]{data}
 }
 
-// GetString returns the estimated count for the provided key.
-func (e Estimator) GetString(key string) int64 {
-	return e.get(func(seed maphash.Seed) uint64 { return maphash.String(seed, key) })
+// Get returns the estimated count for the provided key.
+func (e Estimator[K]) Get(key K) int64 {
+	k := any(key)
+	switch k.(type) {
+	case string:
+		return e.get(func(seed maphash.Seed) uint64 { return maphash.String(seed, k.(string)) })
+	case []byte:
+		return e.get(func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k.([]byte)) })
+	default:
+		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
+	}
 }
 
-// GetBytes returns the estimated count for the provided key.
-func (e Estimator) GetBytes(key []byte) int64 {
-	return e.get(func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, key) })
+// Incr is the equivalent of calling `IncrN(key, 1)`.
+func (e Estimator[K]) Incr(key K) int64 {
+	return e.IncrN(key, 1)
 }
 
-// IncrString is the equivalent of calling `IncrNString(key, 1)`.
-func (e Estimator) IncrString(key string) int64 {
-	return e.IncrNString(key, 1)
-}
-
-// IncrNString increments the count by 'n' for the provided key, returning the
+// IncrN increments the count by 'n' for the provided key, returning the
 // estimated total count.
-func (e Estimator) IncrNString(key string, n int64) int64 {
-	return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.String(seed, key) })
-}
-
-// IncrBytes is the equivalent of calling `IncrNBytes(key, 1)`.
-func (e Estimator) IncrBytes(key []byte) int64 {
-	return e.IncrNBytes(key, 1)
-}
-
-// IncrNBytes increments the count by 'n' for the provided key, returning the
-// estimated total count.
-func (e Estimator) IncrNBytes(key []byte, n int64) int64 {
-	return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, key) })
+func (e Estimator[K]) IncrN(key K, n int64) int64 {
+	k := any(key)
+	switch k.(type) {
+	case string:
+		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.String(seed, k.(string)) })
+	case []byte:
+		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k.([]byte)) })
+	default:
+		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
+	}
 }
 
 // Reset clears the Estimator, returning all counts to 0.
-func (e Estimator) Reset() {
+func (e Estimator[K]) Reset() {
 	for _, hs := range e.data {
 		for i := 0; i < len(hs.slots); i++ {
 			hs.slots[i].Store(0)
@@ -83,7 +103,7 @@ func (e Estimator) Reset() {
 	}
 }
 
-func (e Estimator) get(fn func(maphash.Seed) uint64) int64 {
+func (e Estimator[K]) get(fn func(maphash.Seed) uint64) int64 {
 	var minimum int64 = math.MaxInt64
 	for _, hs := range e.data {
 		hash := fn(hs.seed)
@@ -93,7 +113,7 @@ func (e Estimator) get(fn func(maphash.Seed) uint64) int64 {
 	return minimum
 }
 
-func (e Estimator) incr(n int64, fn func(maphash.Seed) uint64) int64 {
+func (e Estimator[K]) incr(n int64, fn func(maphash.Seed) uint64) int64 {
 	var minimum int64 = math.MaxInt64
 	for _, hs := range e.data {
 		hash := fn(hs.seed)
