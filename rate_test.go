@@ -61,14 +61,6 @@ func TestRateConcurrency(t *testing.T) {
 	}
 }
 
-func assertFloatBetween(t *testing.T, got, min, max float64) {
-	t.Helper()
-
-	if got > max || got < min {
-		t.Fatalf("expected between'%f' and '%f', got '%f'", min, max, got)
-	}
-}
-
 func BenchmarkRateGetString(b *testing.B) {
 	r := NewRate[string](time.Second)
 	b.ResetTimer()

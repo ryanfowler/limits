@@ -78,12 +78,11 @@ func NewEstimatorWithSize[K Key](hashes, slots int) Estimator[K] {
 
 // Get returns the estimated count for the provided key.
 func (e Estimator[K]) Get(key K) int64 {
-	k := any(key)
-	switch k.(type) {
+	switch k := any(key).(type) {
 	case string:
-		return e.get(func(seed maphash.Seed) uint64 { return maphash.String(seed, k.(string)) })
+		return e.get(func(seed maphash.Seed) uint64 { return maphash.String(seed, k) })
 	case []byte:
-		return e.get(func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k.([]byte)) })
+		return e.get(func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k) })
 	default:
 		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
 	}
@@ -97,12 +96,11 @@ func (e Estimator[K]) Incr(key K) int64 {
 // IncrN increments the count by 'n' for the provided key, returning the
 // estimated total count.
 func (e Estimator[K]) IncrN(key K, n int64) int64 {
-	k := any(key)
-	switch k.(type) {
+	switch k := any(key).(type) {
 	case string:
-		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.String(seed, k.(string)) })
+		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.String(seed, k) })
 	case []byte:
-		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k.([]byte)) })
+		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k) })
 	default:
 		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
 	}

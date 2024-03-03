@@ -113,8 +113,3 @@ func (r *Rate[K]) getEstimator(isRed bool) Estimator[K] {
 	}
 	return r.blue
 }
-
-func abs(n int64) int64 {
-	mask := n >> 63
-	return (mask + n) ^ mask
-}
