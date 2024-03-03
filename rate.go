@@ -62,7 +62,7 @@ func NewRateWithSize[K Key](interval time.Duration, hashes, slots int) *Rate[K] 
 	}
 }
 
-// Get returns the total estimated number of events in the previous interval.
+// Get returns the total estimated number of events in the last full interval.
 func (r *Rate[K]) Get(key K) int64 {
 	pastMs := r.maybeReset()
 	if pastMs >= 2*r.resetIntervalMs {
