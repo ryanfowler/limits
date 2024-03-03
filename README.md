@@ -1,6 +1,6 @@
 # limits
 
-Lock-free, space efficient, probabalistic data structures for counting things.
+Lock-free, space efficient, probabilistic data structures for counting things.
 
 ## Usage
 
@@ -42,16 +42,20 @@ by using the `Get` method.
 ```go
 r := NewRate[string](time.Second)
 
-r.Observe("key"")
+n := r.Observe("key"")
+println(n) // Prints "1"
+n = r.Get("key")
+println(n) // Prints "0"
+
 time.Sleep(time.Second)
-n := r.Get("key")
+n = r.Get("key")
 println(n) // Prints "1"
 ```
 
 A full rate limiting implementation will likely want to check the value of the
 current interval, as well as the last "full" interval. This is because the
 current interval may have just started, and thus the value may not be accurate
-as an estimation of the actual number of occurences per interval time.
+as an estimation of the actual number of occurences per interval period.
 
 ```go
 // Allow 10 requests per second
@@ -73,3 +77,7 @@ func AllowRequest(key string) bool {
 	return true
 }
 ```
+
+## License
+
+Apache-2.0 license
