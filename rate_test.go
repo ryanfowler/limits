@@ -69,7 +69,7 @@ func assertFloatBetween(t *testing.T, got, min, max float64) {
 	}
 }
 
-func BenchmarkGetString(b *testing.B) {
+func BenchmarkRateGetString(b *testing.B) {
 	r := NewRate[string](time.Second)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -77,7 +77,7 @@ func BenchmarkGetString(b *testing.B) {
 	}
 }
 
-func BenchmarkGetBytes(b *testing.B) {
+func BenchmarkRateGetBytes(b *testing.B) {
 	r := NewRate[[]byte](time.Second)
 	key := []byte("a")
 	b.ResetTimer()
