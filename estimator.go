@@ -15,7 +15,6 @@
 package limits
 
 import (
-	"fmt"
 	"hash/maphash"
 	"math"
 	"sync/atomic"
@@ -28,18 +27,13 @@ const (
 	DefaultSlots = 8192
 )
 
-// Key represents the type constraint for keys.
-type Key interface {
-	~string | ~[]byte
-}
-
 // Estimator is an implementation of the count-min sketch data structure.
 //
 // An Estimator instance is lock-free, but is safe to use concurrency from
 // multiple goroutines.
 //
 // For more info: https://en.wikipedia.org/wiki/Count%E2%80%93min_sketch
-type Estimator[K Key] struct {
+type Estimator[K comparable] struct {
 	data []hashSlots
 }
 
@@ -50,14 +44,14 @@ type hashSlots struct {
 
 // NewEstimator returns a new Estimator instance using the default hash and slot
 // sizes.
-func NewEstimator[K Key]() Estimator[K] {
+func NewEstimator[K comparable]() Estimator[K] {
 	return NewEstimatorWithSize[K](DefaultHashes, DefaultSlots)
 }
 
 // NewEstimatorWithSize returns a new Estimator instance using the provided
 // number of hashes and slots. This function panics if hashes or slots are less
 // than or equal to zero.
-func NewEstimatorWithSize[K Key](hashes, slots int) Estimator[K] {
+func NewEstimatorWithSize[K comparable](hashes, slots int) Estimator[K] {
 	if hashes <= 0 {
 		panic("limits: hashes must be greater than 0")
 	}
@@ -78,14 +72,13 @@ func NewEstimatorWithSize[K Key](hashes, slots int) Estimator[K] {
 
 // Get returns the estimated count for the provided key.
 func (e Estimator[K]) Get(key K) int64 {
-	switch k := any(key).(type) {
-	case string:
-		return e.get(func(seed maphash.Seed) uint64 { return maphash.String(seed, k) })
-	case []byte:
-		return e.get(func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k) })
-	default:
-		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
+	var minimum int64 = math.MaxInt64
+	for _, hs := range e.data {
+		hash := maphash.Comparable(hs.seed, key)
+		count := hs.slots[int(hash%uint64(len(hs.slots)))].Load()
+		minimum = min(minimum, count)
 	}
+	return minimum
 }
 
 // Incr is the equivalent of calling `IncrN(key, 1)`.
@@ -96,14 +89,13 @@ func (e Estimator[K]) Incr(key K) int64 {
 // IncrN increments the count by 'n' for the provided key, returning the
 // estimated total count.
 func (e Estimator[K]) IncrN(key K, n int64) int64 {
-	switch k := any(key).(type) {
-	case string:
-		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.String(seed, k) })
-	case []byte:
-		return e.incr(n, func(seed maphash.Seed) uint64 { return maphash.Bytes(seed, k) })
-	default:
-		panic(fmt.Sprintf("limits: unknown key type '%T'", key))
+	var minimum int64 = math.MaxInt64
+	for _, hs := range e.data {
+		hash := maphash.Comparable(hs.seed, key)
+		count := hs.slots[int(hash%uint64(len(hs.slots)))].Add(n)
+		minimum = min(minimum, count)
 	}
+	return minimum
 }
 
 // Reset clears the Estimator, returning all counts to 0.
@@ -113,24 +105,4 @@ func (e Estimator[K]) Reset() {
 			hs.slots[i].Store(0)
 		}
 	}
-}
-
-func (e Estimator[K]) get(fn func(maphash.Seed) uint64) int64 {
-	var minimum int64 = math.MaxInt64
-	for _, hs := range e.data {
-		hash := fn(hs.seed)
-		count := hs.slots[int(hash%uint64(len(hs.slots)))].Load()
-		minimum = min(minimum, count)
-	}
-	return minimum
-}
-
-func (e Estimator[K]) incr(n int64, fn func(maphash.Seed) uint64) int64 {
-	var minimum int64 = math.MaxInt64
-	for _, hs := range e.data {
-		hash := fn(hs.seed)
-		count := hs.slots[int(hash%uint64(len(hs.slots)))].Add(n)
-		minimum = min(minimum, count)
-	}
-	return minimum
 }

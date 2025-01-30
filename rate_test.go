@@ -69,28 +69,10 @@ func BenchmarkRateGetString(b *testing.B) {
 	}
 }
 
-func BenchmarkRateGetBytes(b *testing.B) {
-	r := NewRate[[]byte](time.Second)
-	key := []byte("a")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Get(key)
-	}
-}
-
 func BenchmarkRateObserveString(b *testing.B) {
 	r := NewRate[string](time.Second)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		r.Observe("a")
-	}
-}
-
-func BenchmarkRateObserveBytes(b *testing.B) {
-	r := NewRate[[]byte](time.Second)
-	key := []byte("a")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Observe(key)
 	}
 }
