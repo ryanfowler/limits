@@ -52,29 +52,11 @@ func BenchmarkEstimatorGetString(b *testing.B) {
 	}
 }
 
-func BenchmarkEstimatorGetBytes(b *testing.B) {
-	e := NewEstimatorWithSize[[]byte](4, 1024)
-	key := []byte("a")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		e.Get(key)
-	}
-}
-
 func BenchmarkEstimatorIncrString(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		e.Incr("a")
-	}
-}
-
-func BenchmarkEstimatorIncrBytes(b *testing.B) {
-	e := NewEstimatorWithSize[[]byte](4, 1024)
-	key := []byte("a")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		e.Incr(key)
 	}
 }
 

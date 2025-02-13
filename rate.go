@@ -31,7 +31,7 @@ const (
 //
 // A Rate instance is lock-free, but is safe to use concurrency from multiple
 // goroutines.
-type Rate[K Key] struct {
+type Rate[K comparable] struct {
 	red, blue       Estimator[K]
 	isRed           atomic.Bool
 	start           time.Time
@@ -41,14 +41,14 @@ type Rate[K Key] struct {
 
 // NewRate returns a new Rate instance using the provided interval and default
 // sizes. NewRate panics if interval is smaller than 1 millisecond.
-func NewRate[K Key](interval time.Duration) *Rate[K] {
+func NewRate[K comparable](interval time.Duration) *Rate[K] {
 	return NewRateWithSize[K](interval, DefaultRateHashes, DefaultRateSlots)
 }
 
 // NewRateWithSize returns a new Rate instance using the provided interval and
 // hash/slot sizes. NewRateWithSize panics if interval is smaller than 1
 // millisecond.
-func NewRateWithSize[K Key](interval time.Duration, hashes, slots int) *Rate[K] {
+func NewRateWithSize[K comparable](interval time.Duration, hashes, slots int) *Rate[K] {
 	if interval < time.Millisecond {
 		panic("limits: interval must be 1 millisecond or greater")
 	}
