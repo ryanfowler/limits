@@ -1,3 +1,3 @@
 module github.com/ryanfowler/limits
 
-go 1.24rc2
+go 1.24
