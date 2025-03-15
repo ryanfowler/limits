@@ -46,24 +46,24 @@ func assertIntsEqual(t *testing.T, got, exp int64) {
 
 func BenchmarkEstimatorGetString(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		e.Get("a")
 	}
 }
 
 func BenchmarkEstimatorIncrString(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		e.Incr("a")
 	}
 }
 
 func BenchmarkEstimatorReset(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		e.Reset()
 	}
 }
