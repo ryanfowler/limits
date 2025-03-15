@@ -60,7 +60,7 @@ func NewEstimatorWithSize[K comparable](hashes, slots int) Estimator[K] {
 	}
 
 	data := make([]hashSlots, hashes)
-	for i := 0; i < len(data); i++ {
+	for i := range data {
 		data[i] = hashSlots{
 			seed:  maphash.MakeSeed(),
 			slots: make([]atomic.Int64, slots),
@@ -101,7 +101,7 @@ func (e Estimator[K]) IncrN(key K, n int64) int64 {
 // Reset clears the Estimator, returning all counts to 0.
 func (e Estimator[K]) Reset() {
 	for _, hs := range e.data {
-		for i := 0; i < len(hs.slots); i++ {
+		for i := range hs.slots {
 			hs.slots[i].Store(0)
 		}
 	}
