@@ -38,12 +38,12 @@ func TestRateConcurrency(t *testing.T) {
 	r := NewRate[string](time.Second)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			key := strconv.Itoa(i + 1)
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				v := r.Observe(key)
 				if v != int64(j+1) {
 					panic(fmt.Sprintf("unexpected value: %d", v))
@@ -53,7 +53,7 @@ func TestRateConcurrency(t *testing.T) {
 	}
 	wg.Wait()
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		key := strconv.Itoa(i + 1)
 		if v := r.Observe(key); v != 1001 {
 			t.Fatalf("unexpected value: %v", v)
@@ -63,16 +63,14 @@ func TestRateConcurrency(t *testing.T) {
 
 func BenchmarkRateGetString(b *testing.B) {
 	r := NewRate[string](time.Second)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.Get("a")
 	}
 }
 
 func BenchmarkRateObserveString(b *testing.B) {
 	r := NewRate[string](time.Second)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.Observe("a")
 	}
 }
