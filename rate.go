@@ -32,7 +32,7 @@ const (
 // A Rate instance is lock-free, but is safe to use concurrency from multiple
 // goroutines.
 type Rate[K comparable] struct {
-	red, blue       Estimator[K]
+	red, blue       *Estimator[K]
 	isRed           atomic.Bool
 	start           time.Time
 	resetIntervalMs int64
@@ -107,7 +107,7 @@ func (r *Rate[K]) maybeReset() int64 {
 	return pastMs
 }
 
-func (r *Rate[K]) getEstimator(isRed bool) Estimator[K] {
+func (r *Rate[K]) getEstimator(isRed bool) *Estimator[K] {
 	if isRed {
 		return r.red
 	}

@@ -7,9 +7,7 @@ func TestEstimator(t *testing.T) {
 		key1 = "one"
 		key2 = "two"
 	)
-
 	est := NewEstimator[string]()
-
 	v := est.Incr(key1)
 	assertIntsEqual(t, v, 1)
 	v = est.Incr(key2)
@@ -44,25 +42,43 @@ func assertIntsEqual(t *testing.T, got, exp int64) {
 	}
 }
 
-func BenchmarkEstimatorGetString(b *testing.B) {
+func BenchmarkEstimatorGetStringSmall(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
-
 	for b.Loop() {
 		e.Get("a")
 	}
 }
 
-func BenchmarkEstimatorIncrString(b *testing.B) {
+func BenchmarkEstimatorIncrStringSmall(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
-
 	for b.Loop() {
 		e.Incr("a")
 	}
 }
 
-func BenchmarkEstimatorReset(b *testing.B) {
+func BenchmarkEstimatorResetSmall(b *testing.B) {
 	e := NewEstimatorWithSize[string](4, 1024)
+	for b.Loop() {
+		e.Reset()
+	}
+}
 
+func BenchmarkEstimatorGetStringLarge(b *testing.B) {
+	e := NewEstimatorWithSize[string](8, 8192)
+	for b.Loop() {
+		e.Get("a")
+	}
+}
+
+func BenchmarkEstimatorIncrStringLarge(b *testing.B) {
+	e := NewEstimatorWithSize[string](8, 8192)
+	for b.Loop() {
+		e.Incr("a")
+	}
+}
+
+func BenchmarkEstimatorResetLarge(b *testing.B) {
+	e := NewEstimatorWithSize[string](8, 8192)
 	for b.Loop() {
 		e.Reset()
 	}
