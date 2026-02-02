@@ -34,6 +34,24 @@ func TestEstimator(t *testing.T) {
 	assertIntsEqual(t, v, 0)
 }
 
+func TestIncrNReturnValue(t *testing.T) {
+	// Use a small estimator where hash collisions make rows diverge.
+	est := NewEstimatorWithSize[string](4, 16)
+
+	// Increment many distinct keys to create varying row counts, then
+	// verify that IncrN always returns the same value as an immediate Get.
+	keys := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+	for _, key := range keys {
+		for n := int64(1); n <= 5; n++ {
+			got := est.IncrN(key, n)
+			want := est.Get(key)
+			if got != want {
+				t.Fatalf("IncrN(%q, %d) = %d, but Get(%q) = %d", key, n, got, key, want)
+			}
+		}
+	}
+}
+
 func assertIntsEqual(t *testing.T, got, exp int64) {
 	t.Helper()
 

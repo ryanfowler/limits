@@ -61,6 +61,44 @@ func TestRateConcurrency(t *testing.T) {
 	}
 }
 
+func TestRateConcurrentReset(t *testing.T) {
+	const interval = 200 * time.Millisecond
+
+	r := NewRate[string](interval)
+
+	// Fill the current interval with observations.
+	for i := range 100 {
+		r.Observe(strconv.Itoa(i))
+	}
+
+	// Sleep past one interval so the data moves to the inactive estimator.
+	time.Sleep(interval + 10*time.Millisecond)
+
+	// Verify the data is still accessible before concurrent access.
+	if v := r.Get("0"); v != 1 {
+		t.Fatalf("precondition failed: Get(\"0\") = %d, want 1", v)
+	}
+
+	// Race many goroutines on Get. After the initial maybeReset above,
+	// subsequent calls within this interval should not trigger another
+	// reset and should all see the data.
+	var wg sync.WaitGroup
+	for range 100 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, key := range []string{"0", "1", "2", "3", "4"} {
+				v := r.Get(key)
+				if v == 0 {
+					t.Errorf("Get(%q) returned 0 after single interval; expected > 0", key)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 func BenchmarkRateGetString(b *testing.B) {
 	r := NewRate[string](time.Second)
 	for b.Loop() {
