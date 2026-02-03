@@ -102,6 +102,9 @@ func (r *Rate[K]) maybeReset() int64 {
 		if pastMs >= 2*r.resetIntervalMs {
 			r.getEstimator(isRed).Reset()
 		}
+	} else {
+		lastReset = r.lastResetTime.Load()
+		pastMs = now - lastReset
 	}
 
 	return pastMs

@@ -42,7 +42,7 @@ by using the `Get` method.
 ```go
 r := NewRate[string](time.Second)
 
-n := r.Observe("key"")
+n := r.Observe("key")
 println(n) // Prints "1"
 n = r.Get("key")
 println(n) // Prints "0"

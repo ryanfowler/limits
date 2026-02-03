@@ -92,11 +92,12 @@ func (e *Estimator[K]) IncrN(key K, n int64) int64 {
 	h1, h2 := maphash.Comparable(e.seed1, key), maphash.Comparable(e.seed2, key)
 
 	// First pass: get rows that match the minimum.
+	var offsets [64]int
 	var mask uint64
 	minimum := int64(math.MaxInt64)
 	for i := range e.rows {
-		index := e.index(h1, h2, i)
-		count := e.data[i*e.columns+index].Load()
+		offsets[i] = i*e.columns + e.index(h1, h2, i)
+		count := e.data[offsets[i]].Load()
 		if count < minimum {
 			minimum = count
 			mask = 1 << uint64(i)
@@ -105,14 +106,17 @@ func (e *Estimator[K]) IncrN(key K, n int64) int64 {
 		}
 	}
 
-	// Second pass: increment only the rows that matched the minimum.
-	minimum = math.MaxInt64
+	// Second pass: increment only the rows that matched the minimum,
+	// but take the minimum across ALL rows.
+	minimum = int64(math.MaxInt64)
 	for i := range e.rows {
+		var count int64
 		if (mask>>uint(i))&1 == 1 {
-			index := e.index(h1, h2, i)
-			count := e.data[i*e.columns+index].Add(n)
-			minimum = min(minimum, count)
+			count = e.data[offsets[i]].Add(n)
+		} else {
+			count = e.data[offsets[i]].Load()
 		}
+		minimum = min(minimum, count)
 	}
 
 	return minimum
