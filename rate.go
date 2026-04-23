@@ -56,7 +56,7 @@ func NewRateWithSize[K comparable](interval time.Duration, hashes, slots int) *R
 		red:             NewEstimatorWithSize[K](hashes, slots),
 		blue:            NewEstimatorWithSize[K](hashes, slots),
 		isRed:           atomic.Bool{},
-		start:           time.Now().UTC(),
+		start:           time.Now(),
 		resetIntervalMs: interval.Milliseconds(),
 		lastResetTime:   atomic.Int64{},
 	}
