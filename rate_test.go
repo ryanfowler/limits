@@ -1,7 +1,6 @@
 package limits
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"testing"
@@ -46,7 +45,8 @@ func TestRateConcurrency(t *testing.T) {
 			for j := range 1000 {
 				v := r.Observe(key)
 				if v != int64(j+1) {
-					panic(fmt.Sprintf("unexpected value: %d", v))
+					t.Errorf("unexpected value: %d", v)
+					return
 				}
 			}
 		}()
@@ -58,6 +58,30 @@ func TestRateConcurrency(t *testing.T) {
 		if v := r.Observe(key); v != 1001 {
 			t.Fatalf("unexpected value: %v", v)
 		}
+	}
+}
+
+func TestRateConcurrencySameKey(t *testing.T) {
+	r := NewRate[string](time.Second)
+	key := "shared"
+
+	const workers = 100
+	const observations = 1000
+
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range observations {
+				r.Observe(key)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if v := r.Observe(key); v <= 0 {
+		t.Fatalf("unexpected value: %d, want > 0", v)
 	}
 }
 
