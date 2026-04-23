@@ -29,7 +29,7 @@ const (
 // Rate is a probabilistic rate estimator over a given interval. Internally, it
 // uses multiple `Estimator`s to track the number of events per key.
 //
-// A Rate instance is lock-free, but is safe to use concurrency from multiple
+// A Rate instance is lock-free, but is safe for concurrent use by multiple
 // goroutines.
 type Rate[K comparable] struct {
 	red, blue       *Estimator[K]

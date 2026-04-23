@@ -29,7 +29,7 @@ const (
 
 // Estimator is an implementation of the count-min sketch data structure.
 //
-// An Estimator instance is lock-free, but is safe to use concurrency from
+// An Estimator instance is lock-free, but is safe for concurrent use by
 // multiple goroutines.
 //
 // For more info: https://en.wikipedia.org/wiki/Count%E2%80%93min_sketch
