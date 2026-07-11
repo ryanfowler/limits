@@ -29,7 +29,7 @@ const (
 
 // Estimator is an implementation of the count-min sketch data structure.
 //
-// An Estimator instance is lock-free, but is safe to use concurrency from
+// An Estimator instance is lock-free, but is safe for concurrent use by
 // multiple goroutines.
 //
 // For more info: https://en.wikipedia.org/wiki/Count%E2%80%93min_sketch
@@ -91,31 +91,13 @@ func (e *Estimator[K]) Incr(key K) int64 {
 func (e *Estimator[K]) IncrN(key K, n int64) int64 {
 	h1, h2 := maphash.Comparable(e.seed1, key), maphash.Comparable(e.seed2, key)
 
-	// First pass: get rows that match the minimum.
-	var offsets [64]int
-	var mask uint64
+	// Increment every row. Updating only rows at the current minimum is a
+	// conservative update for a single event, but can make the estimate lower
+	// than the number of events for a batch increment.
 	minimum := int64(math.MaxInt64)
 	for i := range e.rows {
-		offsets[i] = i*e.columns + e.index(h1, h2, i)
-		count := e.data[offsets[i]].Load()
-		if count < minimum {
-			minimum = count
-			mask = 1 << uint64(i)
-		} else if count == minimum {
-			mask |= 1 << uint64(i)
-		}
-	}
-
-	// Second pass: increment only the rows that matched the minimum,
-	// but take the minimum across ALL rows.
-	minimum = int64(math.MaxInt64)
-	for i := range e.rows {
-		var count int64
-		if (mask>>uint(i))&1 == 1 {
-			count = e.data[offsets[i]].Add(n)
-		} else {
-			count = e.data[offsets[i]].Load()
-		}
+		index := i*e.columns + e.index(h1, h2, i)
+		count := e.data[index].Add(n)
 		minimum = min(minimum, count)
 	}
 

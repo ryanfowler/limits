@@ -1,6 +1,9 @@
 package limits
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestEstimator(t *testing.T) {
 	const (
@@ -32,6 +35,46 @@ func TestEstimator(t *testing.T) {
 	assertIntsEqual(t, v, 0)
 	v = est.Get(key2)
 	assertIntsEqual(t, v, 0)
+}
+
+func TestEstimatorIncrNWithDivergentRows(t *testing.T) {
+	// With one slot per row, set up the selected rows with different counts.
+	est := NewEstimatorWithSize[string](3, 1)
+	est.data[0].Store(0)
+	est.data[1].Store(1)
+	est.data[2].Store(10)
+
+	if got := est.IncrN("key", 5); got < 5 {
+		t.Fatalf("IncrN returned %d, want at least 5", got)
+	}
+	if got := est.Get("key"); got < 5 {
+		t.Fatalf("Get returned %d, want at least 5", got)
+	}
+}
+
+func TestEstimatorConcurrentIncr(t *testing.T) {
+	const (
+		workers      = 32
+		observations = 1000
+	)
+
+	est := NewEstimatorWithSize[string](4, 1)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range observations {
+				est.Incr("key")
+			}
+		}()
+	}
+	wg.Wait()
+
+	want := int64(workers * observations)
+	if got := est.Get("key"); got < want {
+		t.Fatalf("Get returned %d, want at least %d", got, want)
+	}
 }
 
 func TestIncrNReturnValue(t *testing.T) {
